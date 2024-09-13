@@ -1,52 +1,110 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useUser } from "@clerk/nextjs";
 import Link from 'next/link'
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Star, Search } from "lucide-react"
+import { Star, Search, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { PlusCircle } from "lucide-react"
 import { Sidebar } from "./Sidebar"
-
-const initialWines = [
-  { id: 1, name: "Château Margaux 2015", type: "Red", region: "Bordeaux", isDrunk: false, rating: 0, description: "A full-bodied red with notes of blackberry and cassis." },
-  { id: 2, name: "Cloudy Bay Sauvignon Blanc 2020", type: "White", region: "Marlborough", isDrunk: false, rating: 0, description: "Crisp and refreshing with tropical fruit flavors." },
-  { id: 3, name: "Dom Pérignon 2010", type: "Sparkling", region: "Champagne", isDrunk: false, rating: 0, description: "Elegant bubbles with a complex bouquet of flavors." },
-  { id: 4, name: "Opus One 2018", type: "Red Blend", region: "Napa Valley", isDrunk: false, rating: 0, description: "A harmonious blend of Cabernet Sauvignon and Merlot." },
-  { id: 5, name: "Antinori Tignanello 2017", type: "Red Blend", region: "Tuscany", isDrunk: false, rating: 0, description: "A Super Tuscan with bold flavors and smooth tannins." },
-  { id: 6, name: "Château d'Yquem 2015", type: "Dessert", region: "Sauternes", isDrunk: false, rating: 0, description: "A lusciously sweet wine with notes of apricot and honey." },
-]
-
-const wineTypeColors = {
-  "Red": "bg-red-300",
-  "White": "bg-yellow-100",
-  "Sparkling": "bg-blue-100",
-  "Red Blend": "bg-red-400",
-  "Dessert": "bg-amber-200"
-}
+import { getAllWines, toggleWineDrunkStatus, updateWineRating, deleteWine } from '../queries/wineQueries'
+import { useToast } from "@/hooks/use-toast"
+import { WINE_TYPE_COLORS } from '../constants/wineTypes';
 
 export function BeigeWineDashboard() {
-  const [wines, setWines] = useState(initialWines)
+  const { user, isLoaded } = useUser();
+  const [wines, setWines] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("name")
   const [groupBy, setGroupBy] = useState("none")
+  const { toast } = useToast()
 
-  const handleDrunkToggle = (id) => {
-    setWines(wines.map(wine => 
-      wine.id === id ? { ...wine, isDrunk: !wine.isDrunk, rating: wine.isDrunk ? 0 : wine.rating } : wine
-    ))
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchWines()
+    }
+  }, [isLoaded, user])
+
+  const fetchWines = async () => {
+    if (user) {
+      try {
+        const fetchedWines = await getAllWines()
+        setWines(fetchedWines)
+      } catch (error) {
+        console.error('Error fetching wines:', error)
+        // Handle error (e.g., show a toast notification)
+      }
+    }
   }
 
-  const handleRatingChange = (id, rating) => {
-    setWines(wines.map(wine => 
-      wine.id === id ? { ...wine, rating } : wine
-    ))
+  const handleDrunkToggle = async (id) => {
+    const originalWines = [...wines]
+    const wineIndex = wines.findIndex(wine => wine.id === id)
+    const updatedWines = [...wines]
+    const newIsDrunk = !updatedWines[wineIndex].isDrunk
+    updatedWines[wineIndex] = { 
+      ...updatedWines[wineIndex], 
+      isDrunk: newIsDrunk,
+      rating: newIsDrunk ? updatedWines[wineIndex].rating : 0 // Reset rating to 0 if marked as undrunk
+    }
+    setWines(updatedWines)
+
+    try {
+      await toggleWineDrunkStatus(id)
+    } catch (error) {
+      console.error('Error toggling wine drunk status:', error)
+      setWines(originalWines)
+      toast({
+        title: "Error",
+        description: "Failed to update wine status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRatingChange = async (id, rating) => {
+    const originalWines = [...wines]
+    const wineIndex = wines.findIndex(wine => wine.id === id)
+    const updatedWines = [...wines]
+    updatedWines[wineIndex] = { ...updatedWines[wineIndex], rating }
+    setWines(updatedWines)
+
+    try {
+      await updateWineRating(id, rating)
+    } catch (error) {
+      console.error('Error updating wine rating:', error)
+      setWines(originalWines)
+      toast({
+        title: "Error",
+        description: "Failed to update wine rating. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteWine = async (id) => {
+    try {
+      await deleteWine(id)
+      setWines(wines.filter(wine => wine.id !== id))
+      toast({
+        title: "Wine Deleted",
+        description: "The wine has been removed from your cellar.",
+      })
+    } catch (error) {
+      console.error('Error deleting wine:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete wine. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const sortedWines = [...wines].sort((a, b) => {
@@ -72,6 +130,19 @@ export function BeigeWineDashboard() {
     )
     return acc
   }, {})
+
+  const getWineTypeColor = (type) => {
+    const lowerType = type.toLowerCase();
+    return WINE_TYPE_COLORS[lowerType] || '#d1d5db';
+  };
+
+  if (!isLoaded) {
+    return <div>Loading...</div>
+  }
+
+  if (!user) {
+    return <div>Please sign in to view your wine collection.</div>
+  }
 
   return (
     <div className="min-h-screen bg-[#f5e6d3]">
@@ -203,6 +274,20 @@ export function BeigeWineDashboard() {
                                 <span className="col-span-2 sm:col-span-3">{wine.description}</span>
                               </div>
                             </div>
+                            <DialogFooter>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  handleDeleteWine(wine.id);
+                                  document.querySelector(`[data-state="open"]`).click(); // Close the dialog
+                                }}
+                                className="bg-red-400 text-white hover:bg-red-500"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Wine
+                              </Button>
+                            </DialogFooter>
                           </DialogContent>
                         </Dialog>
                       </CardHeader>
@@ -210,7 +295,10 @@ export function BeigeWineDashboard() {
                       <CardFooter className="pt-2 pb-4 flex justify-between items-center">
                         <div className="text-sm text-[#6b5236]">
                           <p className="flex items-center">
-                            <span className={`inline-block w-3 h-3 rounded-full mr-2 ${wineTypeColors[wine.type]}`}></span>
+                            <span 
+                              className="inline-block w-3 h-3 rounded-full mr-2"
+                              style={{backgroundColor: getWineTypeColor(wine.type)}}
+                            ></span>
                             Type: {wine.type}
                           </p>
                           <p>Region: {wine.region}</p>
