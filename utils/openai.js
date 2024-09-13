@@ -23,7 +23,7 @@ export async function scanWineImage(imageUrl, apiKey) {
         {
           role: "user",
           content: [
-            { type: "text", text: "You are an AI for an online wine cellar. Your job is to scan and determine the exact bottle of wine in the image. Provide the following information in a structured format:\n\nWine Name:\nType: (choose from Red, Sparkling, White, Rose, Dessert, Fortified)\nRegion:\nDescription: (2-3 sentences about the wine in a conversational tone.). DO NOT USE ASTERISKS * OR OTHER MARKUP. THE DESCRIPTION MUST INCLUDE its flavor profile AND MUST INCLUDE THE SUGAR CONTENT (FOR EXACT SUGAR CONTENT SEARCH through lcbo.com on the web) and what food/cheese it pairs well with. INCLUDE THE YEAR OF THE WINE IN THE NAME if you know it. DO NOT INCLUDE THE WINE NAME IN THE DESCRIPTION. If it won any awards, be sure to mention the awards!" },
+            { type: "text", text: "You are an AI for an online wine cellar. Your job is to scan and determine the exact bottle of wine in the image. Provide the following information in a structured format:\n\nWine Name:\nType: (choose from Red, Sparkling, White, Rose, Dessert, Fortified)\nRegion:\nDescription: (2-3 sentences about the wine in a conversational tone.). DO NOT USE ASTERISKS * OR OTHER MARKUP. THE DESCRIPTION MUST INCLUDE its flavor profile AND MUST INCLUDE THE SUGAR CONTENT and what food/cheese it pairs well with. INCLUDE THE YEAR OF THE WINE IN THE NAME if you know it. DO NOT INCLUDE THE WINE NAME IN THE DESCRIPTION. If it won any awards, be sure to mention the awards!" },
             {
               type: "image_url",
               image_url: { url: imageUrl },
